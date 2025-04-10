@@ -55,13 +55,13 @@ class Header:
 
 class Transaction:
     field_id = "02"
-    counter: int|None
+    counter: int | None
     amount: int
     currency: str
 
-    def __init__(self, counter: int|None, amount: int, currency: str) -> None:
+    def __init__(self, counter: int | None, amount: int, currency: str) -> None:
         self.counter = counter
-        if self.counter and self.counter> 20000:
+        if self.counter and self.counter > 20000:
             raise ValueError("exceeds 20 000 characters")
         self.amount = amount
         if len(str(self.amount)) > 12:
@@ -137,74 +137,68 @@ class Storage:
         self.counter = 0
         self.header = self.read_header()
         self.read_transactions()
-        
+        self.footer = self.read_footer()
+
     def create_increment_transaction(self) -> int:
         lenght_transactions = len(self.class_transactions)
         self.counter = lenght_transactions + 1
         if self.counter > 20000:
             raise ValueError("Maximum number of transactions reached")
         return self.counter
-    
+
     def read_header(self) -> Header:
-        self.file.seek(0,0)
+        self.file.seek(0, 0)
         raw_header = self.file.readline().decode("utf-8")
         header = Header.interpretation_from_file_text(raw_header[0:120])
 
         return header
 
     def read_transactions(self):
-        self.file.seek(121,0)
+        self.file.seek(121, 0)
         lines = self.file.readlines()
         transactions = lines[:-1]
         for k in transactions:
             transaction = Transaction.from_text(k.decode("utf-8"))
-            self.class_transactions[transaction.counter]=transaction
+            self.class_transactions[transaction.counter] = transaction
 
     def read_footer(self) -> Footer:
         self.file.seek(-120, os.SEEK_END)
         raw_footer = self.file.readline().decode("utf-8")
         footer = Footer.from_text(raw_footer)
         return footer
-    
+
     def save_transaction(self, transaction: Transaction):
         if transaction.counter is None:
             transaction.counter = self.create_increment_transaction()
         self.class_transactions[self.counter] = transaction
-            
-    def save_footer(self):
-        footer=Footer(0,0)
+
+    def save_footer(self) -> Footer:
+        footer = Footer(0, 0)
         if self.class_transactions is None:
             raise Exception("You dont have any transactions")
         lenght_transactions = len(self.class_transactions)
         footer.total_counter = lenght_transactions
-        sum_of_amount = 0 
-        for k,v in self.class_transactions.items():
-            sum_of_amount+=v.amount
-        footer.total_counter= lenght_transactions
-        footer.control_sum= sum_of_amount
-        print(lenght_transactions, sum_of_amount)
-        
-    
+        sum_of_amount = 0
+        for k, v in self.class_transactions.items():
+            sum_of_amount += v.amount
+        footer.total_counter = lenght_transactions
+        footer.control_sum = sum_of_amount
+        # print(f"\nFooter Information: \nFooter ID:{footer.field_id}, Total Counter:{footer.total_counter}, Control Sum:{footer.control_sum}")
+        return footer
+
+    def flush(self):
+        self.file.seek(0,0)
+        self.file.write((self.header.format_to_text()+"\n").encode("utf-8"))
+        for k, v in self.class_transactions.items():
+            self.file.write((v.format_to_text()+"\n").encode("utf-8"))
+        self.file.write(
+            (self.save_footer().format_to_text()+"\n").encode("utf-8"))
 
 
-with open("first.db", "rb")as file1:
+with open("first.db", "rb+")as file1:
     storage = Storage(file1)
-    transac = Transaction(None,5000, "PLN")
+    transac = Transaction(None, 8000, "PLN")
     storage.save_transaction(transac)
     
-    print(f"transactions for {storage.read_header().name}: \n")
-    storage.read_transactions()
-    
-    for k,v in storage.class_transactions.items():
-        print(k, v.format_to_text())
-        
-    print(storage.save_footer())
-    print(storage.read_footer())
 
-
-    # with open("second.db", "w") as second_file:
-    #     second_file.write(str(storage.read_header().format_to_text())+"\n")
-    #     for k,v in storage.class_transactions.items():
-    #         second_file.write(v.format_to_text()+"\n")
-    #     second_file.write(str(storage.read_footer().format_to_text()))
-        
+    fl = storage.flush()
